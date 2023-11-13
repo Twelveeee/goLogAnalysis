@@ -1,0 +1,23 @@
+Database:
+    Driver:  "mysql"
+    Dsn: 
+    DbName: "log_analysis"
+    Server: "127.0.0.1"
+    User: "root"
+    Password: 
+    Port : 3306
+    Conns: 10
+    ConnsIdle: 100
+Aliyun:
+    # like "oss-cn-beijing.aliyuncs.com"
+    Endpoint: 
+    AccessKeyId: 
+    AccessKeySecret: 
+    OssBucketPath:
+      - Bucket:
+        Path:
+      - Bucket:
+        Path:
+
+File:
+  downLoadFilePath: "storage"
