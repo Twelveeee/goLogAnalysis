@@ -1,6 +1,8 @@
 package util
 
-import "os"
+import (
+	"os"
+)
 
 func FileExists(fileName string) bool {
 	if fileName == "" {
