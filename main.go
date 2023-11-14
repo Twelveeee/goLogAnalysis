@@ -28,8 +28,8 @@ var Metadata = map[string]interface{}{
 
 func main() {
 	defer func() {
-		if r := recover(); r != nil {
-			log.Fatal().Msgf("run recover %v", r)
+		if err := recover(); err != nil {
+			log.Fatal().Msgf("run recover %v", err)
 			os.Exit(1)
 		}
 	}()
