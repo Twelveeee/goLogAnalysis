@@ -1,7 +1,10 @@
 package command
 
 import (
+	"context"
+
 	"github.com/twelveeee/log_analysis/config"
+	"github.com/twelveeee/log_analysis/service/client"
 	"github.com/urfave/cli/v2"
 )
 
@@ -23,10 +26,32 @@ var startFlags = []cli.Flag{
 }
 
 func startAction(ctx *cli.Context) error {
-	_, err := config.InitConfig(ctx)
+	conf, err := config.InitConfig(ctx)
 	if err != nil {
 		return err
 	}
 
+	// Pass this context down the chain.
+	cctx, cancel := context.WithCancel(context.Background())
+
+	go Start(cctx, conf, cancel)
+
+	<-cctx.Done()
+
+	log.Info().Msg("down...")
+	cancel()
+
 	return nil
+}
+
+func Start(ctx context.Context, conf *config.Config, cancel context.CancelFunc) {
+	defer func() {
+		if err := recover(); err != nil {
+			log.Fatal().Msgf("Start recover %v", err)
+		}
+	}()
+
+	client.StartAliyunOss(conf)
+
+	cancel()
 }
