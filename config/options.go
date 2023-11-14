@@ -10,7 +10,7 @@ import (
 
 type Options struct {
 	File struct {
-		downLoadFilePath string `yaml:"downLoadFilePath"`
+		DownLoadPath string `yaml:"DownLoadPath"`
 	} `yaml:"File"`
 
 	Database struct {
@@ -35,7 +35,7 @@ type Options struct {
 
 type AliyunBucketPath struct {
 	Bucket string `yaml:"Bucket"`
-	Path   string `yaml:"Path"`
+	Prefix string `yaml:"Prefix"`
 }
 
 // Load uses a yaml config file to initiate the configuration entity.

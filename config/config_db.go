@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/twelveeee/log_analysis/service/entity"
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
 )
@@ -40,9 +41,9 @@ func (c *Config) initDb() error {
 
 	if dbDriver == "mysql" {
 		mysqlDB, err := gorm.Open(mysql.Open(dbDsn))
-		if err != nil || db == nil {
+		if err != nil || mysqlDB == nil {
 			for i := 1; i <= 3; i++ {
-				db, err := gorm.Open(mysql.Open(dbDsn))
+				mysqlDB, err = gorm.Open(mysql.Open(dbDsn))
 				if db != nil && err == nil {
 					break
 				}
@@ -50,8 +51,8 @@ func (c *Config) initDb() error {
 				time.Sleep(5 * time.Second)
 			}
 
-			if err != nil || db == nil {
-				return err
+			if err != nil || mysqlDB == nil {
+				return errors.New("config: db connect fail")
 			}
 		}
 		db = mysqlDB
@@ -128,7 +129,7 @@ func (c *Config) DatabaseDsn() string {
 		}
 	}
 
-	return c.options.Database.Driver
+	return c.options.Database.Dsn
 }
 
 func (c *Config) DatabaseServer() string {
@@ -157,4 +158,30 @@ func (c *Config) DatabaseConns() int {
 
 func (c *Config) DatabaseConnsIdle() int {
 	return c.options.Database.ConnsIdle
+}
+
+func (c *Config) Db() *gorm.DB {
+	if c.db == nil {
+		log.Fatal().Msg("config: database not connected")
+	}
+
+	return c.db
+}
+
+// RegisterDb sets the database options and connection provider.
+func (c *Config) RegisterDb() {
+	c.SetDbOptions()
+	entity.SetDbProvider(c)
+}
+
+// SetDbOptions sets the database collation to unicode if supported.
+func (c *Config) SetDbOptions() {
+	switch c.DatabaseDriver() {
+	case MySQL, MariaDB:
+		c.Db().Set("gorm:table_options", "ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci")
+	case Postgres:
+		// Ignore for now.
+	case SQLite3:
+		// Not required as unicode is default.
+	}
 }

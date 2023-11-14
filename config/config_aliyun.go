@@ -2,7 +2,6 @@ package config
 
 import (
 	"errors"
-	"fmt"
 	"sync"
 
 	"github.com/aliyun/aliyun-oss-go-sdk/oss"
@@ -35,9 +34,9 @@ func (c *Config) initAliyunClient() error {
 		return err
 	}
 
-	// if err = c.checkAliyunClient(client); err != nil {
-	// 	return err
-	// }
+	if err = c.checkAliyunClient(client); err != nil {
+		return err
+	}
 
 	c.client.AliyunClient = client
 
@@ -45,13 +44,17 @@ func (c *Config) initAliyunClient() error {
 }
 
 func (c *Config) checkAliyunClient(client *oss.Client) error {
-	lsRes, err := client.ListBuckets()
+	_, err := client.ListBuckets()
 	if err != nil {
 		return err
 	}
-
-	for _, bucket := range lsRes.Buckets {
-		fmt.Println("Buckets:", bucket.Name)
-	}
 	return nil
+}
+
+func (c *Config) GetAliyunClient() *oss.Client {
+	return c.client.AliyunClient
+}
+
+func (c *Config) GetAliyunOssBucketPathList() []AliyunBucketPath {
+	return c.options.Aliyun.OssBucketPathList
 }

@@ -15,9 +15,9 @@ Aliyun:
     AccessKeySecret: 
     OssBucketPath:
       - Bucket:
-        Path:
+        Prefix:
       - Bucket:
-        Path:
+        Prefix:
 
 File:
-  downLoadFilePath: "storage"
+  DownLoadPath: "storage"
