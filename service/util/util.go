@@ -27,7 +27,7 @@ func IpToInt(ipStr string) uint32 {
 	return ipInt
 }
 
-func ConverToTimestamp(timeStr string) int64 {
+func ConverToTimestamp(timeStr string) time.Time {
 	// 去除头尾中括号
 	timeStr = strings.Trim(timeStr, "[]")
 	timeStr = strings.Trim(timeStr, ":")
@@ -37,10 +37,8 @@ func ConverToTimestamp(timeStr string) int64 {
 	t, err := time.Parse(layout, timeStr)
 	if err != nil {
 		log.Error().Msgf("unkwon timeStr :%s", timeStr)
-		return 0
+		return time.Time{}
 	}
 
-	// 转换为时间戳
-	timestamp := t.Unix()
-	return timestamp
+	return t
 }

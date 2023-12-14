@@ -6,6 +6,7 @@ import (
 
 // dbConn is the global gorm.DB connection provider.
 var dbConn Gorm
+var dbTableNameCache DbTableNameCache
 
 // Gorm is a gorm.DB connection provider interface.
 type Gorm interface {
