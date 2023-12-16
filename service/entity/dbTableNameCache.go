@@ -3,8 +3,9 @@ package entity
 import "sync"
 
 type DbTableNameCache struct {
-	cache map[string]bool
-	lock  sync.RWMutex
+	cache           map[string]bool
+	lock            sync.RWMutex
+	CreateTableLock sync.Mutex
 }
 
 func HasTableCache(value string) bool {
@@ -31,4 +32,12 @@ func ClearHasTableCache() {
 	defer dbTableNameCache.lock.Unlock()
 
 	dbTableNameCache.cache = make(map[string]bool)
+}
+
+func CreateTableLock() {
+	dbTableNameCache.CreateTableLock.Lock()
+}
+
+func CreateTableUnlock() {
+	dbTableNameCache.CreateTableLock.Unlock()
 }
