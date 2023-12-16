@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"os"
 
 	"github.com/twelveeee/log_analysis/command"
@@ -47,10 +48,15 @@ func main() {
 	app.Metadata = Metadata
 	// os.Args = append(os.Args, "start")
 
-	log.Info().Msgf("start app os.Args: %v", os.Args[1:])
+	fmt.Printf("start app os.Args: %v \n", os.Args[1:])
 	if err := app.Run(os.Args); err != nil {
-		log.Err(err).Msg("run error")
+		fmt.Println()
+		fmt.Println()
+		fmt.Println("****************************************")
+		fmt.Printf("run error: %v \n", err)
+		fmt.Println("****************************************")
+
 	}
 
-	log.Info().Msg("task done")
+	fmt.Printf("task done \n")
 }
