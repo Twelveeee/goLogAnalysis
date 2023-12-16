@@ -40,22 +40,12 @@ func (c *Config) initDb() error {
 	var db *gorm.DB
 
 	if dbDriver == "mysql" {
-		mysqlDB, err := gorm.Open(mysql.Open(dbDsn))
-		if err != nil || mysqlDB == nil {
-			for i := 1; i <= 3; i++ {
-				mysqlDB, err = gorm.Open(mysql.Open(dbDsn))
-				if db != nil && err == nil {
-					break
-				}
-
-				time.Sleep(5 * time.Second)
-			}
-
-			if err != nil || mysqlDB == nil {
-				return errors.New("config: db connect fail")
-			}
+		mysqlDb, err := getMysqlDb(dbDsn)
+		if err != nil {
+			return err
 		}
-		db = mysqlDB
+
+		db = mysqlDb
 	}
 	sqlDB, err := db.DB()
 	if err != nil {
@@ -172,6 +162,7 @@ func (c *Config) Db() *gorm.DB {
 func (c *Config) RegisterDb() {
 	c.SetDbOptions()
 	entity.SetDbProvider(c)
+	entity.ClearHasTableCache()
 }
 
 // SetDbOptions sets the database collation to unicode if supported.
@@ -184,4 +175,24 @@ func (c *Config) SetDbOptions() {
 	case SQLite3:
 		// Not required as unicode is default.
 	}
+}
+
+func getMysqlDb(dbDsn string) (*gorm.DB, error) {
+	db, err := gorm.Open(mysql.Open(dbDsn))
+	if err != nil || db == nil {
+		for i := 1; i <= 3; i++ {
+			db, err = gorm.Open(mysql.Open(dbDsn))
+			if db != nil && err == nil {
+				break
+			}
+
+			time.Sleep(5 * time.Second)
+		}
+
+		if err != nil || db == nil {
+			return nil, errors.New("config: db connect fail")
+		}
+	}
+
+	return db, nil
 }
