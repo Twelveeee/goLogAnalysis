@@ -1,9 +1,13 @@
 package command
 
 import (
+	"context"
 	"fmt"
 	"strconv"
+	"time"
 
+	"github.com/twelveeee/log_analysis/config"
+	"github.com/twelveeee/log_analysis/service/client"
 	"github.com/urfave/cli/v2"
 )
 
@@ -17,18 +21,16 @@ var StartDayCommand = cli.Command{
 
 var startDayFlags = []cli.Flag{
 	&cli.StringFlag{
-		Name:     "startDay",
-		Aliases:  []string{"s"},
-		Usage:    "input `STARTDAY` format (YYYY-MM-DD)",
-		Value:    "2023-01-01",
-		Required: true,
+		Name:    "startDay",
+		Aliases: []string{"s"},
+		Usage:   "input `STARTDAY` format (YYYYMMDD)",
+		Value:   "",
 	},
-	&cli.StringFlag{
-		Name:     "endDay",
-		Aliases:  []string{"e"},
-		Usage:    "input `ENDDAY` format (YYYY-MM-DD)",
-		Value:    "2023-01-01",
-		Required: true,
+	&cli.IntFlag{
+		Name:    "days",
+		Aliases: []string{"d"},
+		Usage:   "input `days` int ,from startDay to startDay+days",
+		Value:   1,
 	},
 }
 
@@ -38,15 +40,46 @@ func startDayAction(ctx *cli.Context) error {
 	log.Info().Msg(ctx.Args().Get(0))
 	log.Info().Msg(strconv.Itoa(ctx.Args().Len()))
 
-	log.Info().Msg(ctx.String("startDay"))
+	startDay := ctx.String("startDay")
+	days := ctx.Int("days")
 
-	// if ctx.NArg() > 0 {
-	// 	log.Info().Msg(ctx.Args().Get(0))
-	// } else {
-	// 	log.Info().Msg("asd")
-	// }
-	// log.Info().Msg(ctx.Args().Get(1))
-	fmt.Println(ctx.Args().Tail())
+	var startTime time.Time
+	if len(startDay) == 0 {
+		return fmt.Errorf("startDay is empty")
+		// startTime = time.Now()
+	}
+
+	startTime, _ = time.Parse("20060102", startDay)
+
+	log.Info().Msg("startDay: " + startTime.Format("20060102"))
+	log.Info().Msg("days: " + strconv.Itoa(days))
+
+	conf, err := config.InitConfig(ctx)
+	if err != nil {
+		return err
+	}
+
+	// Pass this context down the chain.
+	cctx, cancel := context.WithCancel(context.Background())
+
+	go StartDay(cctx, conf, cancel, startTime, days)
+
+	<-cctx.Done()
+
+	log.Info().Msg("down...")
+	cancel()
 
 	return nil
+}
+
+func StartDay(ctx context.Context, conf *config.Config, cancel context.CancelFunc, startTime time.Time, days int) {
+	defer func() {
+		if err := recover(); err != nil {
+			log.Fatal().Msgf("StartDay recover %v", err)
+		}
+	}()
+
+	client.StartAliyunOssDay(conf, startTime, days)
+
+	cancel()
 }

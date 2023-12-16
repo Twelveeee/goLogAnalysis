@@ -44,6 +44,9 @@ func (m *OssLog) CreateTable() error {
 		return nil
 	}
 
+	CreateTableLock()
+	defer CreateTableUnlock()
+
 	if !Db().Table(m.TableName()).Migrator().HasTable(m) {
 		if err := Db().Table(m.TableName()).Migrator().CreateTable(m); err != nil {
 			return err
@@ -56,9 +59,9 @@ func (m *OssLog) CreateTable() error {
 func (m *OssLog) CreateInBatches(mList []OssLog, batchSize int) (int64, error) {
 	mMap := make(map[string][]OssLog)
 	for _, v := range mList {
-		if v.IsFilter() {
-			continue
-		}
+		// if v.IsFilter() {
+		// 	continue
+		// }
 
 		mMap[v.TableName()] = append(mMap[v.TableName()], v)
 	}
@@ -83,22 +86,22 @@ func (m *OssLog) CreateInBatches(mList []OssLog, batchSize int) (int64, error) {
 	return RowsAffected, nil
 }
 
-func (m *OssLog) IsFilter() bool {
+func (m *OssLog) IsFilter() (string, bool) {
 	if m.IP == 0 {
-		return true
+		return "empty ip", true
 	}
 
 	if m.Referer == "-" || len(m.Referer) == 0 {
-		return true
+		return "empty referer", true
 	}
 
 	if m.RequestTime.IsZero() {
-		return true
+		return "empty requestTime", true
 	}
 
 	if strings.Contains(m.UA, "aliyun-sdk") {
-		return true
+		return "aliyun-sdk", true
 	}
 
-	return false
+	return "", false
 }

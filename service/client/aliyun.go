@@ -5,9 +5,11 @@ import (
 	"fmt"
 	"net/url"
 	"os"
+	"path/filepath"
 	"regexp"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/aliyun/aliyun-oss-go-sdk/oss"
 	"github.com/twelveeee/log_analysis/config"
@@ -33,34 +35,87 @@ type AliyunOssList struct {
 
 func StartAliyunOss(conf *config.Config) {
 	aliConf := newAliyunOssConf(conf)
-	aliyunOssList := newAliyunOssList(&aliConf)
+	aliyunOssList := newAliyunOssList(&aliConf, time.Now(), 1)
+	saveAliyunOss(aliyunOssList)
+}
 
-	var wg sync.WaitGroup
+func StartAliyunOssDay(conf *config.Config, startTime time.Time, days int) {
+	aliConf := newAliyunOssConf(conf)
+	log.Debug().Msgf("startTime:%s days:%d", startTime.Format("20060102"), days)
+	aliyunOssList := newAliyunOssList(&aliConf, startTime, days)
+	saveAliyunOss(aliyunOssList)
+}
+
+func saveAliyunOss(aliyunOssList []AliyunOssList) {
+	ossFilePathChannel := productFilePath(aliyunOssList)
+	// ossFilePathChannel := productFilePathByStorage()
+	scanAliyunOssFile(ossFilePathChannel)
+}
+
+func productFilePath(aliyunOssList []AliyunOssList) chan string {
+	ossFilePathChannel := make(chan string, 10)
+	go func() {
+		var wg sync.WaitGroup
+		for _, aliyunOss := range aliyunOssList {
+			wg.Add(len(aliyunOss.objectList))
+			for _, object := range aliyunOss.objectList {
+				go func(bucket *oss.Bucket, object oss.ObjectProperties, downloadPath string) {
+					defer wg.Done()
+					filePath := getFilePath(object.Key, downloadPath)
+					if err := downLoadAliyunOss(bucket, object, filePath); err != nil {
+						log.Err(err).Send()
+						return
+					}
+					ossFilePathChannel <- filePath
+				}(aliyunOss.bucket, object, aliyunOss.downloadPath)
+			}
+		}
+
+		go func() {
+			wg.Wait()
+			close(ossFilePathChannel)
+		}()
+	}()
+
+	return ossFilePathChannel
+}
+
+func productFilePathByStorage(storagePath string) chan string {
 	ossFilePathChannel := make(chan string, 10)
 
-	// download aliyun oss file
-	for _, aliyunOss := range aliyunOssList {
-		wg.Add(len(aliyunOss.objectList))
-		for _, object := range aliyunOss.objectList {
-			go func(bucket *oss.Bucket, object oss.ObjectProperties, downloadPath string) {
-				defer wg.Done()
-				filePath := getFilePath(object.Key, downloadPath)
-				if err := downLoadAliyunOss(bucket, object, filePath); err != nil {
-					log.Err(err).Send()
-					return
-				}
-				ossFilePathChannel <- filePath
-			}(aliyunOss.bucket, object, aliyunOss.downloadPath)
+	var wg sync.WaitGroup
+	err := filepath.Walk(storagePath, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
 		}
+		if info.IsDir() {
+			return nil
+		}
+
+		wg.Add(1)
+		go func() {
+			// 忽略文件夹，只处理文件
+			ossFilePathChannel <- path
+			wg.Done()
+			fmt.Println(path) // 打印文件路径
+		}()
+
+		return nil
+	})
+
+	if err != nil {
+		fmt.Printf("filepath.Walk() returned %v\n", err)
 	}
 
-	// download success close channel
 	go func() {
 		wg.Wait()
 		close(ossFilePathChannel)
 	}()
 
-	// read oss file to db
+	return ossFilePathChannel
+}
+
+func scanAliyunOssFile(ossFilePathChannel chan string) {
 	var fileWg sync.WaitGroup
 	for filePath := range ossFilePathChannel {
 		fileWg.Add(1)
@@ -85,7 +140,7 @@ func newAliyunOssConf(conf *config.Config) AliyunOssConfig {
 	}
 }
 
-func newAliyunOssList(conf *AliyunOssConfig) []AliyunOssList {
+func newAliyunOssList(conf *AliyunOssConfig, startDay time.Time, days int) []AliyunOssList {
 	ret := make([]AliyunOssList, 0)
 	client := conf.client
 	for _, bucketPath := range conf.pathList {
@@ -95,17 +150,22 @@ func newAliyunOssList(conf *AliyunOssConfig) []AliyunOssList {
 			continue
 		}
 
-		lsRes, err := bucket.ListObjects(oss.Prefix(bucketPath.Prefix))
-		if err != nil {
-			log.Err(err).Send()
-			continue
+		for i := 0; i < days; i++ {
+			prefix := fmt.Sprintf("%s%s", bucketPath.Prefix, startDay.AddDate(0, 0, i).Format("2006-01-02"))
+			log.Debug().Msgf("bucket: %s prefix: %s", bucketPath.Bucket, prefix)
+			lsRes, err := bucket.ListObjects(oss.Prefix(prefix))
+			if err != nil {
+				log.Err(err).Send()
+				continue
+			}
+
+			ret = append(ret, AliyunOssList{
+				bucket:       bucket,
+				objectList:   lsRes.Objects,
+				downloadPath: conf.downloadPath,
+			})
 		}
 
-		ret = append(ret, AliyunOssList{
-			bucket:       bucket,
-			objectList:   lsRes.Objects,
-			downloadPath: conf.downloadPath,
-		})
 	}
 
 	return ret
@@ -153,8 +213,12 @@ func scanAliyunOss(filePath string) {
 	for scanner.Scan() {
 		line := scanner.Text()
 		ossLog := aliyuLogToOssLog(line)
-		if ossLog.IsFilter() {
-			log.Info().Msgf("filter:oss filter line:%s", line)
+		if reason, ok := ossLog.IsFilter(); ok {
+			if reason == "aliyun-sdk" {
+				continue
+			}
+
+			log.Info().Msgf("filter:oss filter reason:%s line :%s", reason, line)
 			continue
 		}
 		ossList = append(ossList, ossLog)
